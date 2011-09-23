@@ -125,7 +125,10 @@ class PySkein:
             logging.info("  %s to %s" % (patch, patches_dest))
             shutil.copy2("%s/%s" % (patches_src, patch), patches_dest)
     
-    def _create_gh_repo(self):
+    def _create_gh_repo(self, organization=None):
+        if organization:
+            ghs.org = organization
+
         logging.info("== Creating github repository '%s/%s' ==" % (ghs.org, self.name))
         try:
             github = Github(username=ghs.username, api_token=ghs.api_token)
@@ -140,6 +143,13 @@ class PySkein:
             logging.info("  Remote '%s/%s' already exists" % (ghs.org, self.name))
             #print str(e.message)
             pass
+
+    def _get_gh_repos(self, organization=None):
+        if organization:
+            ghs.org = org
+
+        github = Github(username=ghs.username, api_token=ghs.api_token)
+        return github.repos.list(user=ghs.org)
 
     # create a git repository pointing to appropriate github repo
     def _clone_git_repo(self, repo_dir, scm_url):
@@ -280,7 +290,6 @@ class PySkein:
             print "'%s' is not valid" % path
             sys.exit(1)
 
-
     def list_deps(self, args):
 
         path = args.path
@@ -294,6 +303,51 @@ class PySkein:
                 logging.info("  %s" % br)
                 print "  %s" % br
             print ""
+
+    def do_migrate(self, args):
+
+        for r in self._get_gh_repos()[0:5]:
+            self.name = r.name
+            self.url = r.url
+            self.summary = r.description
+            name = self.name.lower()
+            repo_dir = u"%s/%s" % (sks.base_dir, self.name)
+            self._makedir(repo_dir)
+            scm_url = u"%s/%s.git" %(sks.git_remote, self.name)
+            new_scm_url = u"%s/%s.git" %(sks.new_git_remote, self.name)
+
+            if name not in sks.project_excludes:
+                print "Name: %s, URL: %s, Summary: %s" % (self.name, self.url, self.summary)
+
+                self._create_gh_repo(organization='gooselinux')
+        
+                try:
+                    self.repo = git.Repo(repo_dir)
+                except InvalidGitRepositoryError, e:
+                    gitrepo = git.Git(repo_dir)
+                    cmd = ['git', 'init']
+                    result = git.Git.execute(gitrepo, cmd)
+                    self.repo = git.Repo(repo_dir)
+        
+                logging.info("  Performing git pull from origin at '%s'" % scm_url)
+        
+                try:
+                    self.repo.delete_remote('origin') #ensure the pull is from scm_url and not new_scm_url
+                    self.repo.create_remote('origin', scm_url)
+                    self.repo.remotes['origin'].pull('refs/heads/master:refs/heads/master')
+                except (AssertionError, GitCommandError), e:
+                    logging.debug("--- Exception thrown [%s]" % e)
+                    origin = self.repo.remotes['origin']
+    
+                try:
+                    self.repo.delete_remote('origin')
+                    self.repo.create_remote('origin', new_scm_url)
+                    self.repo.remotes['origin'].push('refs/heads/master:refs/heads/master')
+                except GitCommandError, e:
+                    logging.debug("--- Exception thrown %s" % e)
+
+
+
 
     def do_import(self, args):
 
@@ -350,11 +404,11 @@ def main():
     ps = PySkein()
 
     p = argparse.ArgumentParser(
-            description='''Imports all src.rpms into git and lookaside cache''',
+            description='''migrate all repos from gooseproject to gooselinux''',
         )
 
-    p.add_argument('path', help='path to src.rpms')
-    p.set_defaults(func=ps.do_import)
+#    p.add_argument('path', help='path to src.rpms')
+    p.set_defaults(func=ps.do_migrate)
 
     args = p.parse_args()
     args.func(args)

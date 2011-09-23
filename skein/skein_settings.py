@@ -16,6 +16,7 @@ commit_message="srpm imported (%s %s)" % (distro, version)
 project_root = u"%s/Projects" % home
 base_dir = u"%s/%s" % (project_root, ghs.org)
 git_remote = u"git@github.com:%s" % ghs.org
+new_git_remote = u"git@github.com:%s" % ghs.new_org
 lookaside_dir = u"%s/%s" % (base_dir, 'lookaside')
 
 #path for Makefile.tpl
@@ -34,4 +35,15 @@ logformat="%(levelname)s %(asctime)s %(message)s"
 logdateformat="%m/%d/%Y %I:%M:%S %p"
 loglevel=logging.DEBUG
 
+#migration settings
+project_excludes = [ 
+    'gooseproject-main', 
+    'GoOSeproject-main-wiki', 
+    'GoOSeproject-ssh-keys', 
+    'bootstrap', 
+    'skein', 
+    'chase', 
+    'grapple', 
+    'planet.gooseproject.org' 
+]
 
